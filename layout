@@ -1,0 +1,44 @@
+#!/bin/bash
+# contents of a .layout file
+# line beginning with a quastion mark contains the variabels that need to be taken in. In all caps, separated by a space (there should also be a space after the question mark
+#		? DIR FILENAME
+# lines biginning with the alpersant contain commands.
+#		& APPLICATION zathura DIR/FILENAME.pdf
+
+# will open a gui application and pass all of teh parameters to it
+openProgram () {
+	eval nohup "$@" 1>/dev/null 2>/dev/null </dev/null  &
+	sleep 0.02
+}
+
+
+# will open the first parameter as a working directory and the second parameter as a file name
+openNvim () {
+	eval nohup alacritty --working-directory "$1" -e nvim +e "$2" 1>/dev/null 2>/dev/null </dev/null  &
+	sleep 0.02
+}
+
+parseLayoutsFile(){
+	declare -A VAR_VALS
+	VAR_NAMES=$(awk '/^\?/ {for (i=2; i<=NF; i++) print $i}' "$1")
+
+	for i in $VAR_NAMES; do
+		VAR_VALS+=([$i]="$(printf "" | dmenu -p "$i")")
+	done
+
+	#echo "${!VAR_VALS[@]}"
+
+
+	COMMANDS=$(awk '/^&/ {print $0}' "$1" | sed "s/& //; s/APPLICATION/openProgram/; s/NEOVIM/openNeovim/;")
+	COMMANDS_PARSED=()
+	for i in "${COMMANDS[@]}"; do
+		COMMAND=$i
+		for j in "${!VAR_VALS[@]}"; do
+			COMMAND="$(echo "$COMMAND" | sed "s/$j/${VAR_VALS[$j]}/")"
+		done
+		COMMANDS_PARSED+=("$COMMAND")
+	done
+	echo "${COMMANDS_PARSED[@]}"
+}
+
+parseLayoutsFile notes.layout
