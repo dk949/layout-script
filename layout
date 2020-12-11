@@ -3,34 +3,50 @@
 # will open a GUI Application and pass all of the parameters to it
 openProgram () {
 	eval nohup "$@" 1>/dev/null 2>/dev/null </dev/null  &
-	sleep 0.02
+	sleep 0.03
 }
 
 
 # will open the first parameter as a working directory and the second parameter as a file name
 openNvim () {
 	eval nohup alacritty --working-directory "$1" -e nvim +e "$2" 1>/dev/null 2>/dev/null </dev/null  &
-	sleep 0.02
+	sleep 0.03
 }
 
 parseLayoutsFile(){
+    # VAR_VALS is a list of key-value pairs
 	declare -A VAR_VALS
+
+    # VAR_NAMES is a list of the variables used in the .layout file (see README for how a .layout file works)
 	VAR_NAMES=$(awk '/^\?/ {for (i=2; i<=NF; i++) print $i}' "$1")
 
 	for i in $VAR_NAMES; do
+        # asking the user what the values for the variables should be
+        # then appending the answer too VAR_VALS
+        # variable name is the key, user input is the value
 		VAR_VALS+=([$i]="$(printf "" | dmenu -p "$i")")
 	done
 
-	COMMANDS=$(awk '/^&/ {print $0}' "$1" | sed "s/& //; s/APPLICATION/openProgram/; s/NEOVIM/openNeovim/;")
+    # replacing the command keywords from the file with their corresponding functions
+    # filtering out only the command strings with awk, then replacing the keywords with sed
+	COMMANDS=$(awk '/^&/ {print $0}' "$1" | sed "s/& //; s/APPLICATION/openProgram/; s/NEOVIM/openNvim/;")
+    # COMMANDS_PARSED is a normal list
 	COMMANDS_PARSED=()
 	for i in "${COMMANDS[@]}"; do
 		COMMAND=$i
 		for j in "${!VAR_VALS[@]}"; do
+            # each command is being processed once for each variable in the file
+            # the variables in the command are replaced by their values
 			COMMAND="${COMMAND//$j/${VAR_VALS[$j]}}"
 		done
+        # after a command has been parsed it is stored
 		COMMANDS_PARSED+=("$COMMAND")
 	done
-	echo "${COMMANDS_PARSED[@]}"
+	for i in "${COMMANDS_PARSED[@]}"
+    do
+        eval "$i"
+    done
 }
 
-parseLayoutsFile "$XDG_CONFIG_HOME"/layouts/notes.layout
+LAYOUT="$(du -h -a "$XDG_CONFIG_HOME"/layouts/* | awk '{print $2}' | dmenu -l 20)"
+parseLayoutsFile "$LAYOUT"
